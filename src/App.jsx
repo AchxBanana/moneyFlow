@@ -3,10 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 const METHODS = [
   { id: "kplus", label: "K PLUS", dot: "#2D7A4F" },
   { id: "cash", label: "เงินสด", dot: "#B8976A" },
-  { id: "scb", label: "SCB Easy", dot: "#7B5EA7" },
-  { id: "promptpay", label: "พร้อมเพย์", dot: "#3A6FD8" },
-  { id: "credit", label: "บัตรเครดิต", dot: "#C0392B" },
-  { id: "other", label: "อื่นๆ", dot: "#999" },
+  { id: "ThaiPlus", label: "ThaiPlus", dot: "#999" },
 ];
 
 const CATS = [
@@ -27,9 +24,7 @@ const SEED = [
   { id: 1, type: "expense", amount: 85, desc: "ข้าวกะเพราไข่ดาว", category: "food", method: "cash", date: "2026-06-01" },
   { id: 2, type: "expense", amount: 350, desc: "เติมน้ำมัน", category: "transport", method: "kplus", date: "2026-06-02" },
   { id: 3, type: "income", amount: 35000, desc: "เงินเดือน", category: "income", method: "kplus", date: "2026-06-01" },
-  { id: 4, type: "expense", amount: 1290, desc: "Netflix", category: "entertainment", method: "credit", date: "2026-06-03" },
-  { id: 5, type: "expense", amount: 450, desc: "ยา + หน้ากาก", category: "health", method: "promptpay", date: "2026-06-04" },
-  { id: 6, type: "expense", amount: 599, desc: "เสื้อผ้า", category: "shopping", method: "kplus", date: "2026-06-05" },
+  { id: 4, type: "expense", amount: 599, desc: "เสื้อผ้า", category: "shopping", method: "kplus", date: "2026-06-05" },
 ];
 
 // ── PALETTE ──────────────────────────────────────────────
