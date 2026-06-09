@@ -23,7 +23,7 @@ const fmt = n => n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFr
 const SEED = [
   { id: 1, type: "expense", amount: 85, desc: "ข้าวกะเพราไข่ดาว", category: "food", method: "cash", date: "2026-06-01" },
   { id: 2, type: "expense", amount: 350, desc: "เติมน้ำมัน", category: "transport", method: "kplus", date: "2026-06-02" },
-  { id: 3, type: "income", amount: 35000, desc: "เงินเดือน", category: "income", method: "kplus", date: "2026-06-01" },
+  { id: 3, type: "income", amount: 35000, desc: "เงินเดือน", category: "income", method: "ThaiPlus", date: "2026-06-01" },
   { id: 4, type: "expense", amount: 599, desc: "เสื้อผ้า", category: "shopping", method: "kplus", date: "2026-06-05" },
 ];
 
