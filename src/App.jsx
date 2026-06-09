@@ -10,6 +10,8 @@ const CATS = [
   { id: "food", label: "อาหาร", icon: "🍜" },
   { id: "transport", label: "เดินทาง", icon: "🚗" },
   { id: "shopping", label: "ช้อปปิ้ง", icon: "🛍" },
+  { id: "coffee", label: "กาแฟ", icon: "☕" },
+  { id: "self", label: "ของใช้ส่วนตัว", icon: "👨‍💻" },
   { id: "health", label: "สุขภาพ", icon: "💊" },
   { id: "entertainment", label: "บันเทิง", icon: "🎬" },
   { id: "bills", label: "ค่าบริการ", icon: "📱" },
