@@ -3,16 +3,17 @@ import { useState, useMemo } from "react";
 const METHODS = [
   { id: "kplus",     label: "K PLUS",    dot: "#2D7A4F" },
   { id: "cash",      label: "เงินสด",     dot: "#B8976A" },
-  { id: "scb",       label: "SCB Easy",  dot: "#7B5EA7" },
-  { id: "promptpay", label: "พร้อมเพย์",  dot: "#3A6FD8" },
-  { id: "credit",    label: "บัตรเครดิต", dot: "#C0392B" },
+  { id: "true",       label: "True money",  dot: "#7B5EA7" },
+  { id: "Thaiplus", label: "ไทยช่วยไทย",  dot: "#3A6FD8" },
   { id: "other",     label: "อื่นๆ",      dot: "#999" },
 ];
 
 const CATS = [
   { id: "food",          label: "อาหาร",    icon: "🍜" },
+  { id: "coffee",        label: "กาแฟ",    icon: "☕" },
   { id: "transport",     label: "เดินทาง",   icon: "🚗" },
   { id: "shopping",      label: "ช้อปปิ้ง",  icon: "🛍" },
+  { id: "personal",      label: "ของใช้ส่วนตัว",  icon: "👨‍💻" },
   { id: "health",        label: "สุขภาพ",    icon: "💊" },
   { id: "entertainment", label: "บันเทิง",   icon: "🎬" },
   { id: "bills",         label: "ค่าบริการ", icon: "📱" },
