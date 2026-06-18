@@ -275,7 +275,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* stat cards */}
+      {/* stat cards — this month only */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "14px 20px 0" }}>
         {[
           { l: "รายรับ", v: income, c: C.income },
@@ -288,18 +288,20 @@ export default function App() {
           </div>
         ))}
       </div>
+      <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>ข้อมูลเฉพาะเดือนที่เลือก</div>
 
-      {/* by method — income / expense / balance */}
+      {/* by method — CUMULATIVE balance across all time (not just this month) */}
       {(() => {
         const methodSummary = METHODS.map(m => ({
           ...m,
-          inc: monthTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
-          exp: monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
+          inc: txs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
+          exp: txs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
         })).map(m => ({ ...m, bal: m.inc - m.exp })).filter(m => m.inc > 0 || m.exp > 0);
         if (!methodSummary.length) return null;
         return (
           <div style={{ margin: "12px 20px 0", ...card, padding: "16px 20px" }}>
-            <div style={{ ...lbl, marginBottom: 14 }}>คงเหลือตามช่องทางชำระ</div>
+            <div style={{ ...lbl, marginBottom: 2 }}>คงเหลือตามช่องทางชำระ</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>ยอดสะสมทั้งหมด ไม่จำกัดเดือน</div>
             {methodSummary.map((m, i) => (
               <div key={m.id} style={{ padding: "11px 0", borderBottom: i < methodSummary.length - 1 ? `1px solid ${C.divider}` : "none" }}>
                 {/* method name */}
