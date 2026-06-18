@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 
-const METHODS = [
+const DEFAULT_METHODS = [
   { id: "kplus", label: "K PLUS", dot: "#2D7A4F" },
   { id: "cash", label: "เงินสด", dot: "#B8976A" },
   { id: "true", label: "True money", dot: "#7B5EA7" },
@@ -23,6 +23,14 @@ const CATS = [
 
 const MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const fmt = n => n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const DOT_PRESETS = ["#2D7A4F", "#B8976A", "#7B5EA7", "#3A6FD8", "#C0392B", "#D98A1F", "#1B998B", "#9B5DE5", "#5B6470", "#999999"];
+const slugify = (label, existingIds) => {
+  let base = (label || "method").trim().toLowerCase().replace(/[^a-z0-9ก-๙]+/g, "-").replace(/^-+|-+$/g, "") || "method";
+  let id = base, n = 1;
+  while (existingIds.includes(id)) id = `${base}-${++n}`;
+  return id;
+};
 
 const SEED = [
   { id: 1, type: "expense", amount: 85, desc: "ข้าวกะเพราไข่ดาว", category: "food", method: "cash", date: "2026-06-01" },
@@ -68,7 +76,13 @@ export default function App() {
       return saved ? JSON.parse(saved) : SEED;
     } catch { return SEED; }
   });
-  const [view, setView] = useState("home");   // home | summary | add
+  const [methods, setMethods] = useState(() => {
+    try {
+      const saved = localStorage.getItem('moneyflow-methods');
+      return saved ? JSON.parse(saved) : DEFAULT_METHODS;
+    } catch { return DEFAULT_METHODS; }
+  });
+  const [view, setView] = useState("home");   // home | summary | add | methods
   const [month, setMonth] = useState(5);
   const [filterM, setFilterM] = useState("all");
   const [form, setForm] = useState({
@@ -76,43 +90,104 @@ export default function App() {
     category: "food", method: "kplus",
     date: new Date().toISOString().slice(0, 10),
   });
+  const [newMethodLabel, setNewMethodLabel] = useState("");
+  const [newMethodDot, setNewMethodDot] = useState(DOT_PRESETS[0]);
+  const [editingMethodId, setEditingMethodId] = useState(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editingTxId, setEditingTxId] = useState(null); // null = adding new, otherwise editing existing tx id
+
   useEffect(() => {
     localStorage.setItem('moneyflow-txs', JSON.stringify(txs));
   }, [txs]);
+  useEffect(() => {
+    localStorage.setItem('moneyflow-methods', JSON.stringify(methods));
+  }, [methods]);
+  // keep the add-form's selected method valid if it gets deleted/renamed elsewhere
+  useEffect(() => {
+    if (!methods.some(m => m.id === form.method) && methods.length) {
+      setForm(f => ({ ...f, method: methods[0].id }));
+    }
+  }, [methods]);
+
+  // normalize unknown method/category ids (e.g. left over from a renamed id) into a safe fallback
+  // so totals always add up correctly instead of silently dropping orphaned transactions
+  const validMethodIds = methods.map(m => m.id);
+  const validCatIds = CATS.map(c => c.id);
+  const fallbackMethodId = methods.find(m => m.id === "other")?.id ?? methods[methods.length - 1]?.id;
+  const normTxs = useMemo(() => txs.map(t => ({
+    ...t,
+    method: validMethodIds.includes(t.method) ? t.method : fallbackMethodId,
+    category: validCatIds.includes(t.category) ? t.category : "other",
+  })), [txs, validMethodIds, fallbackMethodId]);
 
   // ── derived ──
   const monthTxs = useMemo(() =>
-    txs.filter(t => {
+    normTxs.filter(t => {
       const d = new Date(t.date);
       return d.getMonth() === month && d.getFullYear() === 2026;
-    }), [txs, month]);
+    }), [normTxs, month]);
 
   // all-time cumulative totals — used everywhere now (balance card, stat cards, by-method, by-category)
-  const totalIncomeAll = txs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpenseAll = txs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const totalIncomeAll = normTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenseAll = normTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const balanceAll = totalIncomeAll - totalExpenseAll;
 
-  const byMethod = METHODS
-    .map(m => ({ ...m, total: txs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
+  const byMethod = methods
+    .map(m => ({ ...m, total: normTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
     .filter(m => m.total > 0);
 
   const byCat = CATS.filter(c => c.id !== "income")
-    .map(c => ({ ...c, total: txs.filter(t => t.category === c.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
+    .map(c => ({ ...c, total: normTxs.filter(t => t.category === c.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
 
   const filtered = filterM === "all" ? monthTxs : monthTxs.filter(t => t.method === filterM);
-  const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
+  const recent = [...normTxs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
 
   const addTx = () => {
     if (!form.amount || !form.desc) return;
-    setTxs(p => [{ ...form, id: Date.now(), amount: parseFloat(form.amount) }, ...p]);
-    setForm({ type: "expense", amount: "", desc: "", category: "food", method: "kplus", date: new Date().toISOString().slice(0, 10) });
-    setView("home");
+    if (editingTxId) {
+      setTxs(p => p.map(x => x.id === editingTxId ? { ...form, id: editingTxId, amount: parseFloat(form.amount) } : x));
+    } else {
+      setTxs(p => [{ ...form, id: Date.now(), amount: parseFloat(form.amount) }, ...p]);
+    }
+    setForm({ type: "expense", amount: "", desc: "", category: "food", method: methods[0]?.id ?? "other", date: new Date().toISOString().slice(0, 10) });
+    setEditingTxId(null);
+    setView(editingTxId ? "summary" : "home");
+  };
+
+  const startEditTx = (t) => {
+    setForm({ type: t.type, amount: String(t.amount), desc: t.desc, category: t.category, method: t.method, date: t.date });
+    setEditingTxId(t.id);
+    setView("add");
   };
 
   const cat = id => CATS.find(c => c.id === id) || CATS[CATS.length - 1];
-  const meth = id => METHODS.find(m => m.id === id) || METHODS[METHODS.length - 1];
+  const meth = id => methods.find(m => m.id === id) || methods[methods.length - 1];
+
+  // ── method management ──
+  const addMethod = () => {
+    const label = newMethodLabel.trim();
+    if (!label) return;
+    const id = slugify(label, methods.map(m => m.id));
+    setMethods(p => [...p, { id, label, dot: newMethodDot }]);
+    setNewMethodLabel("");
+    setNewMethodDot(DOT_PRESETS[(methods.length) % DOT_PRESETS.length]);
+  };
+  const startEditMethod = (m) => { setEditingMethodId(m.id); setEditLabel(m.label); };
+  const saveEditMethod = () => {
+    const label = editLabel.trim();
+    if (!label) return;
+    setMethods(p => p.map(m => m.id === editingMethodId ? { ...m, label } : m));
+    setEditingMethodId(null);
+    setEditLabel("");
+  };
+  const recolorMethod = (id, dot) => setMethods(p => p.map(m => m.id === id ? { ...m, dot } : m));
+  const deleteMethod = (id) => {
+    if (methods.length <= 1) return; // keep at least one channel
+    // any transactions using this method will be folded into "other" (or another fallback) automatically via normTxs
+    setMethods(p => p.filter(m => m.id !== id));
+  };
 
   // ── shared components ──
   const Dot = ({ id }) => <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: meth(id).dot, flexShrink: 0 }} />;
@@ -133,8 +208,12 @@ export default function App() {
         {t.type === "income" ? "+" : "−"}฿{fmt(t.amount)}
       </span>
       {deletable && (
-        <button onClick={() => setTxs(p => p.filter(x => x.id !== t.id))}
-          style={{ background: "none", border: "none", color: C.muted, fontSize: 13, padding: "2px 4px", lineHeight: 1 }}>✕</button>
+        <>
+          <button onClick={() => startEditTx(t)}
+            style={{ background: "none", border: "none", color: C.muted, fontSize: 13, padding: "2px 4px", lineHeight: 1 }}>✎</button>
+          <button onClick={() => setTxs(p => p.filter(x => x.id !== t.id))}
+            style={{ background: "none", border: "none", color: C.muted, fontSize: 13, padding: "2px 4px", lineHeight: 1 }}>✕</button>
+        </>
       )}
     </div>
   );
@@ -151,13 +230,17 @@ export default function App() {
       ].map(n => (
         <button key={n.v} onClick={() => setView(n.v)} style={{
           flex: 1, background: "none", border: "none",
-          color: view === n.v ? C.accent : C.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 3
+          color: (view === n.v || (n.v === "summary" && view === "methods")) ? C.accent : C.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 3
         }}>
           <span style={{ fontSize: 18, lineHeight: 1 }}>{n.icon}</span>
-          <span style={{ fontSize: 10, fontWeight: view === n.v ? 700 : 400, letterSpacing: "0.05em" }}>{n.label}</span>
+          <span style={{ fontSize: 10, fontWeight: (view === n.v || (n.v === "summary" && view === "methods")) ? 700 : 400, letterSpacing: "0.05em" }}>{n.label}</span>
         </button>
       ))}
-      <button onClick={() => setView("add")} style={{
+      <button onClick={() => {
+        setEditingTxId(null);
+        setForm({ type: "expense", amount: "", desc: "", category: "food", method: methods[0]?.id ?? "other", date: new Date().toISOString().slice(0, 10) });
+        setView("add");
+      }} style={{
         flex: 1, background: "none", border: "none",
         color: view === "add" ? C.accent : C.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 3
       }}>
@@ -293,10 +376,10 @@ export default function App() {
 
       {/* by method — CUMULATIVE balance across all time (not just this month) */}
       {(() => {
-        const methodSummary = METHODS.map(m => ({
+        const methodSummary = methods.map(m => ({
           ...m,
-          inc: txs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
-          exp: txs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
+          inc: normTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
+          exp: normTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
         })).map(m => ({ ...m, bal: m.inc - m.exp })).filter(m => m.inc > 0 || m.exp > 0);
         if (!methodSummary.length) return null;
         return (
@@ -362,13 +445,118 @@ export default function App() {
           <select value={filterM} onChange={e => setFilterM(e.target.value)}
             style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 8px", fontSize: 11, color: C.sub, outline: "none", background: C.surface }}>
             <option value="all">ทุกช่องทาง</option>
-            {METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            {methods.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
         </div>
         {filtered.length === 0
           ? <div style={{ textAlign: "center", color: C.muted, padding: "20px 0", fontSize: 13 }}>ไม่มีรายการ</div>
           : filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => <TxRow key={t.id} t={t} deletable={true} />)
         }
+      </div>
+
+      {/* manage payment channels */}
+      <div style={{ margin: "10px 20px 0" }}>
+        <button onClick={() => setView("methods")} style={{
+          width: "100%", ...card, padding: "14px 20px", display: "flex",
+          alignItems: "center", justifyContent: "space-between", background: C.surface,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>⚙ จัดการช่องทางชำระ</span>
+          <span style={{ color: C.muted, fontSize: 14 }}>→</span>
+        </button>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+
+  // ════════════════════════════════════
+  //  MANAGE METHODS
+  // ════════════════════════════════════
+  if (view === "methods") return (
+    <div style={pageStyle}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      <style>{GLOBAL_CSS}</style>
+
+      <div style={{ padding: "24px 20px 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <button onClick={() => setView("summary")} style={{
+          background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
+          width: 34, height: 34, fontSize: 15, color: C.text,
+        }}>←</button>
+        <div>
+          <div style={lbl}>ตั้งค่า</div>
+          <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2, letterSpacing: -0.4 }}>จัดการช่องทางชำระ</div>
+        </div>
+      </div>
+
+      {/* existing methods list */}
+      <div style={{ margin: "16px 20px 0", ...card, padding: "8px 20px" }}>
+        {methods.map((m, i) => (
+          <div key={m.id} style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "12px 0",
+            borderBottom: i < methods.length - 1 ? `1px solid ${C.divider}` : "none",
+          }}>
+            {/* color swatch + picker */}
+            <label style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}>
+              <span style={{ width: 18, height: 18, borderRadius: "50%", background: m.dot, display: "inline-block", border: `2px solid ${C.surface}`, boxShadow: `0 0 0 1px ${C.border}` }} />
+              <input type="color" value={m.dot} onChange={e => recolorMethod(m.id, e.target.value)}
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: 18, height: 18 }} />
+            </label>
+
+            {/* label / edit input */}
+            {editingMethodId === m.id ? (
+              <input
+                autoFocus
+                value={editLabel}
+                onChange={e => setEditLabel(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && saveEditMethod()}
+                style={{ flex: 1, fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", outline: "none", color: C.text }}
+              />
+            ) : (
+              <span style={{ flex: 1, fontSize: 14, color: C.text }}>{m.label}</span>
+            )}
+
+            {/* actions */}
+            {editingMethodId === m.id ? (
+              <button onClick={saveEditMethod} style={{ background: C.accent, border: "none", color: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600 }}>บันทึก</button>
+            ) : (
+              <button onClick={() => startEditMethod(m)} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, textDecoration: "underline" }}>แก้ไข</button>
+            )}
+            <button onClick={() => deleteMethod(m.id)} disabled={methods.length <= 1}
+              style={{ background: "none", border: "none", color: methods.length <= 1 ? C.border : C.expense, fontSize: 13, padding: "2px 4px", opacity: methods.length <= 1 ? 0.4 : 1 }}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 11, color: C.muted, margin: "8px 20px 0" }}>
+        ลบช่องทางได้เมื่อเหลือมากกว่า 1 ช่องทาง — รายการเก่าที่อยู่ในช่องทางที่ถูกลบจะถูกย้ายไปกอง "อื่นๆ" โดยอัตโนมัติ
+      </div>
+
+      {/* add new method */}
+      <div style={{ margin: "16px 20px 0", ...card, padding: "16px 20px" }}>
+        <div style={{ ...lbl, marginBottom: 10 }}>เพิ่มช่องทางใหม่</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}>
+            <span style={{ width: 22, height: 22, borderRadius: "50%", background: newMethodDot, display: "inline-block", border: `2px solid ${C.surface}`, boxShadow: `0 0 0 1px ${C.border}` }} />
+            <input type="color" value={newMethodDot} onChange={e => setNewMethodDot(e.target.value)}
+              style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: 22, height: 22 }} />
+          </label>
+          <input
+            placeholder="เช่น Rabbit LINE Pay"
+            value={newMethodLabel}
+            onChange={e => setNewMethodLabel(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addMethod()}
+            style={{ flex: 1, fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", outline: "none", color: C.text }}
+          />
+          <button onClick={addMethod} style={{ background: C.accent, border: "none", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>เพิ่ม</button>
+        </div>
+        {/* color presets */}
+        <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+          {DOT_PRESETS.map(c => (
+            <button key={c} onClick={() => setNewMethodDot(c)} style={{
+              width: 20, height: 20, borderRadius: "50%", background: c, border: c === newMethodDot ? `2px solid ${C.text}` : "2px solid transparent", padding: 0,
+            }} />
+          ))}
+        </div>
       </div>
 
       <BottomNav />
@@ -383,9 +571,15 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       <style>{GLOBAL_CSS}</style>
 
-      <div style={{ padding: "24px 20px 0" }}>
-        <div style={lbl}>รายการใหม่</div>
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4, letterSpacing: -0.5 }}>บันทึก</div>
+      <div style={{ padding: "24px 20px 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <button onClick={() => { setEditingTxId(null); setView(editingTxId ? "summary" : "home"); }} style={{
+          background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
+          width: 34, height: 34, fontSize: 15, color: C.text, flexShrink: 0,
+        }}>←</button>
+        <div>
+          <div style={lbl}>{editingTxId ? "แก้ไขรายการ" : "รายการใหม่"}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4, letterSpacing: -0.5 }}>{editingTxId ? "แก้ไข" : "บันทึก"}</div>
+        </div>
       </div>
 
       <div style={{ padding: "20px 20px 0", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -441,7 +635,7 @@ export default function App() {
         <div>
           <div style={{ ...lbl, marginBottom: 8 }}>ช่องทางชำระ</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {METHODS.map(m => (
+            {methods.map(m => (
               <button key={m.id} onClick={() => setForm(f => ({ ...f, method: m.id }))} style={{
                 padding: "7px 13px", borderRadius: 20, fontSize: 13,
                 border: `1px solid ${form.method === m.id ? m.dot : C.border}`,
@@ -467,7 +661,7 @@ export default function App() {
           width: "100%", padding: "15px", background: C.accent, border: "none",
           color: "#fff", borderRadius: 12, fontSize: 15, fontWeight: 700,
           letterSpacing: 0.2, marginTop: 4,
-        }}>บันทึกรายการ</button>
+        }}>{editingTxId ? "บันทึกการแก้ไข" : "บันทึกรายการ"}</button>
       </div>
 
       <BottomNav />
