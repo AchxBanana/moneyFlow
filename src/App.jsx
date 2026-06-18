@@ -91,6 +91,11 @@ export default function App() {
   const expense = monthTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const balance = income - expense;
 
+  // all-time totals (used for the big balance card on home)
+  const totalIncomeAll = txs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenseAll = txs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const balanceAll = totalIncomeAll - totalExpenseAll;
+
   const byMethod = METHODS
     .map(m => ({ ...m, total: monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
     .filter(m => m.total > 0);
@@ -193,24 +198,24 @@ export default function App() {
         <div style={{ ...lbl, marginTop: 6 }}>{MONTHS[5]} 2026</div>
       </div>
 
-      {/* balance card */}
+      {/* balance card — all-time cumulative across every channel */}
       <div style={{ margin: "16px 20px 0", ...card, padding: "20px 24px" }}>
-        <div style={lbl}>คงเหลือเดือนนี้</div>
+        <div style={lbl}>คงเหลือทั้งหมด</div>
         <div style={{
           ...mono, fontSize: 38, fontWeight: 500, letterSpacing: -1.5, marginTop: 6,
-          color: balance >= 0 ? C.text : C.expense
+          color: balanceAll >= 0 ? C.text : C.expense
         }}>
-          ฿{fmt(balance)}
+          ฿{fmt(balanceAll)}
         </div>
         <div style={{ display: "flex", gap: 0, marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.divider}` }}>
           <div style={{ flex: 1 }}>
-            <div style={lbl}>รายรับ</div>
-            <div style={{ ...mono, fontSize: 15, fontWeight: 600, color: C.income, marginTop: 4 }}>+฿{fmt(income)}</div>
+            <div style={lbl}>รายรับสะสม</div>
+            <div style={{ ...mono, fontSize: 15, fontWeight: 600, color: C.income, marginTop: 4 }}>+฿{fmt(totalIncomeAll)}</div>
           </div>
           <div style={{ width: 1, background: C.divider }} />
           <div style={{ flex: 1, paddingLeft: 20 }}>
-            <div style={lbl}>รายจ่าย</div>
-            <div style={{ ...mono, fontSize: 15, fontWeight: 600, color: C.expense, marginTop: 4 }}>−฿{fmt(expense)}</div>
+            <div style={lbl}>รายจ่ายสะสม</div>
+            <div style={{ ...mono, fontSize: 15, fontWeight: 600, color: C.expense, marginTop: 4 }}>−฿{fmt(totalExpenseAll)}</div>
           </div>
         </div>
       </div>
