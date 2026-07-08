@@ -127,17 +127,30 @@ export default function App() {
       return d.getMonth() === month && d.getFullYear() === 2026;
     }), [normTxs, month]);
 
-  // all-time cumulative totals — used everywhere now (balance card, stat cards, by-method, by-category)
+  // all-time cumulative totals — used on home page
   const totalIncomeAll = normTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenseAll = normTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
   const balanceAll = totalIncomeAll - totalExpenseAll;
+
+  const totalIncomeMonth = monthTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenseMonth = monthTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const balanceMonth = totalIncomeMonth - totalExpenseMonth;
 
   const byMethod = methods
     .map(m => ({ ...m, total: normTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
     .filter(m => m.total > 0);
 
+  const byMethodMonth = methods
+    .map(m => ({ ...m, total: monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
+    .filter(m => m.total > 0);
+
   const byCat = CATS.filter(c => c.id !== "income")
     .map(c => ({ ...c, total: normTxs.filter(t => t.category === c.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const byCatMonth = CATS.filter(c => c.id !== "income")
+    .map(c => ({ ...c, total: monthTxs.filter(t => t.category === c.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
 
@@ -362,9 +375,9 @@ export default function App() {
       {/* stat cards — all-time cumulative totals across every channel */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "14px 20px 0" }}>
         {[
-          { l: "รายรับ", v: totalIncomeAll, c: C.income },
-          { l: "รายจ่าย", v: totalExpenseAll, c: C.expense },
-          { l: "คงเหลือ", v: balanceAll, c: balanceAll >= 0 ? C.text : C.expense },
+          { l: "รายรับ", v: totalIncomeMonth, c: C.income },
+          { l: "รายจ่าย", v: totalExpenseMonth, c: C.expense },
+          { l: "คงเหลือ", v: balanceMonth, c: balanceMonth >= 0 ? C.text : C.expense },
         ].map(s => (
           <div key={s.l} style={{ ...card, padding: "12px 14px" }}>
             <div style={lbl}>{s.l}</div>
@@ -372,20 +385,20 @@ export default function App() {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>ยอดสะสมทั้งหมด ไม่จำกัดเดือน</div>
+      <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>ยอดของเดือนนี้</div>
 
-      {/* by method — CUMULATIVE balance across all time (not just this month) */}
+      {/* by method — monthly balance for selected month */}
       {(() => {
         const methodSummary = methods.map(m => ({
           ...m,
-          inc: normTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
-          exp: normTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
+          inc: monthTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
+          exp: monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
         })).map(m => ({ ...m, bal: m.inc - m.exp })).filter(m => m.inc > 0 || m.exp > 0);
         if (!methodSummary.length) return null;
         return (
           <div style={{ margin: "12px 20px 0", ...card, padding: "16px 20px" }}>
             <div style={{ ...lbl, marginBottom: 2 }}>คงเหลือตามช่องทางชำระ</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>ยอดสะสมทั้งหมด ไม่จำกัดเดือน</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>ยอดของเดือนที่เลือก</div>
             {methodSummary.map((m, i) => (
               <div key={m.id} style={{ padding: "11px 0", borderBottom: i < methodSummary.length - 1 ? `1px solid ${C.divider}` : "none" }}>
                 {/* method name */}
@@ -415,13 +428,13 @@ export default function App() {
       })()}
 
       {/* by category */}
-      {byCat.length > 0 && (
+      {byCatMonth.length > 0 && (
         <div style={{ margin: "10px 20px 0", ...card, padding: "16px 20px" }}>
           <div style={{ ...lbl, marginBottom: 12 }}>หมวดหมู่</div>
-          {byCat.map((c, i) => (
+          {byCatMonth.map((c, i) => (
             <div key={c.id} style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 0",
-              borderBottom: i < byCat.length - 1 ? `1px solid ${C.divider}` : "none"
+              borderBottom: i < byCatMonth.length - 1 ? `1px solid ${C.divider}` : "none"
             }}>
               <span style={{ fontSize: 16, width: 22, textAlign: "center", flexShrink: 0 }}>{c.icon}</span>
               <div style={{ flex: 1 }}>
@@ -430,7 +443,7 @@ export default function App() {
                   <span style={{ ...mono, fontSize: 12, fontWeight: 600, color: C.expense }}>฿{fmt(c.total)}</span>
                 </div>
                 <div style={{ background: C.tag, borderRadius: 3, height: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: 3, background: C.muted, width: `${Math.min(100, (c.total / totalExpenseAll) * 100)}%` }} />
+                  <div style={{ height: "100%", borderRadius: 3, background: C.muted, width: `${Math.min(100, (c.total / totalExpenseMonth) * 100)}%` }} />
                 </div>
               </div>
             </div>
