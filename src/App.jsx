@@ -134,7 +134,17 @@ export default function App() {
 
   const totalIncomeMonth = monthTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenseMonth = monthTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  const balanceMonth = totalIncomeMonth - totalExpenseMonth;
+
+  const prevMonthTxs = useMemo(() =>
+    normTxs.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === 2026 && d.getMonth() < month;
+    }), [normTxs, month]);
+  const prevIncome = prevMonthTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const prevExpense = prevMonthTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const carryover = prevIncome - prevExpense;
+  const availableMonth = carryover + totalIncomeMonth;
+  const balanceMonth = availableMonth - totalExpenseMonth;
 
   const byMethod = methods
     .map(m => ({ ...m, total: normTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0) }))
@@ -372,10 +382,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* stat cards — all-time cumulative totals across every channel */}
+      {/* stat cards — monthly available funds including carryover */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "14px 20px 0" }}>
         {[
-          { l: "รายรับ", v: totalIncomeMonth, c: C.income },
+          { l: "เงินใช้ได้", v: availableMonth, c: C.income },
           { l: "รายจ่าย", v: totalExpenseMonth, c: C.expense },
           { l: "คงเหลือ", v: balanceMonth, c: balanceMonth >= 0 ? C.text : C.expense },
         ].map(s => (
@@ -385,7 +395,7 @@ export default function App() {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>ยอดของเดือนนี้</div>
+      <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>รวมยอดสะสมที่เหลือจากเดือนก่อนกับรายรับเดือนนี้</div>
 
       {/* by method — monthly balance for selected month */}
       {(() => {
@@ -443,7 +453,7 @@ export default function App() {
                   <span style={{ ...mono, fontSize: 12, fontWeight: 600, color: C.expense }}>฿{fmt(c.total)}</span>
                 </div>
                 <div style={{ background: C.tag, borderRadius: 3, height: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: 3, background: C.muted, width: `${Math.min(100, (c.total / totalExpenseMonth) * 100)}%` }} />
+                  <div style={{ height: "100%", borderRadius: 3, background: C.muted, width: `${Math.min(100, totalExpenseMonth > 0 ? (c.total / totalExpenseMonth) * 100 : 0)}%` }} />
                 </div>
               </div>
             </div>
