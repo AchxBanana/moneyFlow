@@ -397,25 +397,33 @@ export default function App() {
       </div>
       <div style={{ fontSize: 11, color: C.muted, margin: "6px 20px 0" }}>รวมยอดสะสมที่เหลือจากเดือนก่อนกับรายรับเดือนนี้</div>
 
-      {/* by method — monthly balance for selected month */}
+      {/* by method — monthly balance for selected month with carryover */}
       {(() => {
-        const methodSummary = methods.map(m => ({
-          ...m,
-          inc: monthTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0),
-          exp: monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0),
-        })).map(m => ({ ...m, bal: m.inc - m.exp })).filter(m => m.inc > 0 || m.exp > 0);
+        const methodSummary = methods.map(m => {
+          const inc = monthTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0);
+          const exp = monthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+          const prevInc = prevMonthTxs.filter(t => t.method === m.id && t.type === "income").reduce((s, t) => s + t.amount, 0);
+          const prevExp = prevMonthTxs.filter(t => t.method === m.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+          const carry = prevInc - prevExp;
+          return { ...m, inc, exp, carry, bal: inc - exp + carry };
+        }).filter(m => m.inc > 0 || m.exp > 0 || m.carry !== 0);
         if (!methodSummary.length) return null;
         return (
           <div style={{ margin: "12px 20px 0", ...card, padding: "16px 20px" }}>
             <div style={{ ...lbl, marginBottom: 2 }}>คงเหลือตามช่องทางชำระ</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>ยอดของเดือนที่เลือก</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>ยอดของเดือนนี้รวมกับยอดคงเหลือจากเดือนก่อน</div>
             {methodSummary.map((m, i) => (
               <div key={m.id} style={{ padding: "11px 0", borderBottom: i < methodSummary.length - 1 ? `1px solid ${C.divider}` : "none" }}>
                 {/* method name */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <Dot id={m.id} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{m.label}</span>
                 </div>
+                {m.carry !== 0 && (
+                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
+                    ยอดคงเหลือจากเดือนก่อน {m.carry >= 0 ? `+฿${fmt(m.carry)}` : `−฿${fmt(Math.abs(m.carry))}`}
+                  </div>
+                )}
                 {/* 3 cols */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
                   <div style={{ background: C.tag, borderRadius: 8, padding: "8px 10px" }}>
